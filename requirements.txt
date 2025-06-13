@@ -1,0 +1,2 @@
+# Agrega aquí tus dependencias
+openpyxl
