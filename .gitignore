@@ -61,3 +61,8 @@ __pycache__/
 
 # JetBrains IDEs
 .idea/
+
+
+# Local configuration files
+data/
+

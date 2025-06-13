@@ -1,2 +1,4 @@
 # Agrega aquí tus dependencias
 openpyxl
+pandas
+xlrd>=2.0.1
