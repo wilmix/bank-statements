@@ -68,23 +68,7 @@ def process_bank_file(file_path):
         return None, None
 
 def main():
-    """
-    Punto de entrada principal para procesar archivos bancarios.
-    """
-    parser = argparse.ArgumentParser(description='Procesador de extractos bancarios')
-    parser.add_argument('--archivo', type=str, help='Ruta a un archivo específico para procesar')
-    args = parser.parse_args()
-    
-    if args.archivo:
-        # Procesar solo el archivo especificado
-        process_bank_file(args.archivo)
-    else:
-        # Procesar todos los archivos configurados
-        print(f"Procesando {len(EXCEL_FILES)} archivos configurados...")
-        for archivo in EXCEL_FILES:
-            process_bank_file(archivo)
-    
-    print("\nProcesamiento completado.")
+    print("Proyecto base listo. Agrega tu lógica para procesar archivos xlsx aquí.")
 
 if __name__ == "__main__":
     main()
