@@ -66,17 +66,52 @@ def identificar_banco_y_cuenta(df):
     return 'Desconocido', 'No encontrado'
 
 def clean_bnb(df):
-    """Limpieza específica para extractos BNB."""
+    """
+    Limpieza específica para extractos BNB.
+    - Elimina filas vacías y sin fecha
+    - Limpia espacios en columnas de texto
+    - Estandariza formatos de referencia y códigos
+    """
     # Buscar la fila que contiene los encabezados reales
     header_row = df[df.iloc[:, 0] == 'Fecha'].index[0] if 'Fecha' in df.iloc[:, 0].values else 0
     headers = df.iloc[header_row].values
     df_clean = df.iloc[header_row+1:].copy()
     df_clean.columns = headers
+    
     # Eliminar filas vacías y sin fecha
     df_clean = df_clean.dropna(how='all')
     df_clean = df_clean[df_clean['Fecha'].notnull()]
-    # Invertir el orden
+    
+    # Limpiar espacios en columnas de texto
+    columnas_texto = ['Referencia', 'Descripción', 'Código de transacción', 'Adicionales']
+    for col in columnas_texto:
+        if col in df_clean.columns:
+            df_clean[col] = df_clean[col].astype(str).apply(lambda x: 
+                x.strip() if pd.notna(x) else x
+            )
+    
+    # Limpiar referencias y códigos específicamente
+    if 'Referencia' in df_clean.columns:
+        df_clean['Referencia'] = df_clean['Referencia'].astype(str).apply(lambda x: 
+            ' '.join(x.split()) if pd.notna(x) else x
+        )
+    
+    if 'Código de transacción' in df_clean.columns:
+        df_clean['Código de transacción'] = df_clean['Código de transacción'].astype(str).apply(lambda x: 
+            x.strip().replace(' ', '') if pd.notna(x) else x
+        )
+    
+    # Asegurar que los montos sean numéricos
+    for col in ['Débitos', 'Créditos', 'Saldo', 'ITF']:
+        if col in df_clean.columns:
+            df_clean[col] = pd.to_numeric(
+                df_clean[col].astype(str).str.replace(',', ''),
+                errors='coerce'
+            )
+    
+    # Invertir el orden para que los primeros movimientos estén arriba
     df_clean = df_clean.iloc[::-1].reset_index(drop=True)
+    
     return df_clean
 
 def clean_bcp(df):
