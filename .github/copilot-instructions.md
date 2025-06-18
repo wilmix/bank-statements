@@ -22,6 +22,49 @@ This Python project processes bank statements from Excel files, with special foc
    - Match by date and amount
    - Enrich with payment information
 
+## Database Mapping Requirements
+
+When processing bank statements, ensure the output matches these database requirements:
+
+1. **Amount Handling**:
+```python
+# Amounts must be positive in their respective columns
+if amount < 0:
+    debit_amount = abs(amount)
+    credit_amount = None
+else:
+    credit_amount = amount
+    debit_amount = None
+
+# Validate amounts
+assert debit_amount is None or debit_amount >= 0
+assert credit_amount is None or credit_amount >= 0
+assert not (debit_amount is None and credit_amount is None)
+```
+
+2. **Bank Code Validation**:
+```python
+VALID_BANK_CODES = {'BNB1', 'BNB2', 'BNBUSD', 'BCP', 'UNION'}
+
+def validate_bank_code(code: str) -> bool:
+    return code in VALID_BANK_CODES
+```
+
+3. **Company Voucher Generation**:
+```python
+def generate_company_voucher(bank: str, date: datetime, voucher: str) -> str:
+    """Generate unique company voucher."""
+    date_str = date.strftime('%Y%m%d')
+    return f"{bank}-{date_str}-{voucher}"
+```
+
+4. **Date and Time Handling**:
+```python
+# Always convert dates to ISO format
+transaction_date = pd.to_datetime(date_str).date()  # YYYY-MM-DD
+transaction_time = pd.to_datetime(time_str).time()  # HH:MM:SS
+```
+
 ## Code Guidelines
 
 ### General Principles

@@ -25,10 +25,8 @@ def process_bcp_statement_workflow(file_path: Path, df: pd.DataFrame) -> pd.Data
         pd.DataFrame: The cleaned and enriched DataFrame
     """
     print("\nProcessing BCP bank statement...")
-    
-    # Clean and save statement
+      # Clean and save statement
     df_clean = clean_bcp(df)
-    df_clean['bank'] = 'BCP'
     clean_csv = DATA_PROCESSED / f"{file_path.stem}_clean.csv"
     df_clean.to_csv(clean_csv, index=False)
     print(f"\nBCP statement saved to: {clean_csv}")

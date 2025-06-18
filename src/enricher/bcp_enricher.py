@@ -40,20 +40,21 @@ class BCPEnricher:
         # Remove empty rows
         df_new = df_new.dropna(how='all')
         
-        # Clean dates
+        # Clean dates and convert to datetime
         if 'FECHA' in df_new.columns:
-            df_new['FECHA'] = df_new['FECHA'].apply(standardize_date)
+            df_new['FECHA'] = pd.to_datetime(df_new['FECHA'].apply(standardize_date))
             
         # Clean amounts
         if 'MONTO ABONADO' in df_new.columns:
             df_new['MONTO ABONADO'] = df_new['MONTO ABONADO'].apply(format_currency)
             
-        # Generate details column
+        # Generate enriched details column
         df_new['Adicionales'] = df_new.apply(
-            lambda row: f"{row['TITULAR']} - {row['GLOSA']}" if pd.notna(row['TITULAR']) and pd.notna(row['GLOSA']) 
-            else row['TITULAR'] if pd.notna(row['TITULAR']) 
-            else row['GLOSA'] if pd.notna(row['GLOSA'])
-            else None,
+            lambda row: ' - '.join(filter(pd.notna, [
+                row.get('TITULAR', None),
+                row.get('GLOSA', None),
+                f"Canal: {row.get('CANAL', '')}" if pd.notna(row.get('CANAL', None)) else None
+            ])),
             axis=1
         )
         
@@ -61,8 +62,12 @@ class BCPEnricher:
         
     def enrich_statement(self, df_bcp: pd.DataFrame, df_payments: pd.DataFrame) -> Tuple[pd.DataFrame, Dict]:
         """
-        Enrich BCP statement with payment details.
+        Enrich BCP statement with payment details according to updated mapping schema.
         
+        Args:
+            df_bcp (pd.DataFrame): Cleaned BCP statement
+            df_payments (pd.DataFrame): Cleaned payment details
+            
         Returns:
             tuple: (enriched_df, statistics)
         """
@@ -74,11 +79,14 @@ class BCPEnricher:
         df_enriched = df_bcp.copy()
         
         # Verify required columns
-        if 'Fecha' not in df_bcp.columns or 'Importe' not in df_bcp.columns:
-            return df_bcp, {'error': 'Missing required columns in BCP statement'}
+        required_bcp = ['Fecha', 'Importe', 'Nro. Operación']
+        required_payments = ['FECHA', 'MONTO ABONADO', 'Adicionales']
+        
+        if not all(col in df_bcp.columns for col in required_bcp):
+            return df_bcp, {'error': f'Missing required columns in BCP statement: {required_bcp}'}
             
-        if 'FECHA' not in df_payments.columns or 'MONTO ABONADO' not in df_payments.columns:
-            return df_bcp, {'error': 'Missing required columns in payment report'}
+        if not all(col in df_payments.columns for col in required_payments):
+            return df_bcp, {'error': f'Missing required columns in payment report: {required_payments}'}
             
         # Initialize statistics
         stats = {
@@ -88,43 +96,33 @@ class BCPEnricher:
             'multiple_matches': 0,
             'no_match': 0
         }
-        
-        # Convert amounts to numeric
-        df_enriched['Importe'] = df_enriched['Importe'].apply(format_currency)
+          # Ensure datetime for matching
+        df_enriched['Fecha'] = pd.to_datetime(df_enriched['Fecha'])
+        df_payments['FECHA'] = pd.to_datetime(df_payments['FECHA'], format='%d/%m/%Y')
         
         # Add details column if not exists
         if 'Adicionales' not in df_enriched.columns:
             df_enriched['Adicionales'] = None
             
-        # Match records
-        for idx, row in df_enriched.iterrows():
-            # Find matches by date and amount
+        # Match records by date and amount
+        for idx, bcp_row in df_enriched.iterrows():            # Convert amounts to float and round
+            bcp_amount = round(float(abs(bcp_row['Importe'])), 2)
+            payment_amounts = df_payments['MONTO ABONADO'].astype(float).round(2)
+            
             matches = df_payments[
-                (df_payments['FECHA'] == row['Fecha']) & 
-                (df_payments['MONTO ABONADO'] == abs(row['Importe']))
+                (df_payments['FECHA'] == bcp_row['Fecha']) & 
+                (payment_amounts == bcp_amount)
             ]
             
             if len(matches) == 1:
-                # Single match
-                df_enriched.at[idx, 'Adicionales'] = matches['Adicionales'].iloc[0]
+                # Single match found
+                df_enriched.at[idx, 'Adicionales'] = matches.iloc[0]['Adicionales']
                 stats['matched'] += 1
-                
             elif len(matches) > 1:
-                # Multiple matches
-                df_enriched.at[idx, 'Adicionales'] = ' | '.join(matches['Adicionales'].dropna().unique())
+                # Multiple matches - concatenate details
+                df_enriched.at[idx, 'Adicionales'] = ' | '.join(matches['Adicionales'].dropna())
                 stats['multiple_matches'] += 1
-                
-                print(f"\nMultiple matches for transaction on {row['Fecha']} amount {row['Importe']}:")
-                print(matches[['FECHA', 'MONTO ABONADO', 'Adicionales']].to_string())
             else:
                 stats['no_match'] += 1
                 
-        # Show statistics
-        print("\nMatching statistics:")
-        print(f"Total BCP transactions: {stats['total_bcp']}")
-        print(f"Total payment records: {stats['total_payments']}")
-        print(f"Single matches: {stats['matched']}")
-        print(f"Multiple matches: {stats['multiple_matches']}")
-        print(f"Unmatched: {stats['no_match']}")
-        
         return df_enriched, stats
