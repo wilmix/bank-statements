@@ -71,10 +71,8 @@ def main():
         print(f"File not found: {file_path}")
         return
         
-    print(f"Processing file: {file_path}")
-
-    # Read Excel
-    df = pd.read_excel(file_path, header=0)
+    print(f"Processing file: {file_path}")    # Read Excel - BNB files have 2 header rows
+    df = pd.read_excel(file_path, header=None)
     
     # First check if it's a BCP payment report
     is_payment_report, account = detect_bcp_payment_report(df)
@@ -94,10 +92,11 @@ def main():
     if bank == "BCP":
         # Special workflow for BCP statements
         df_clean = process_bcp_statement_workflow(file_path, df)
-    else:
-        # Normal workflow for other banks
+    else:        # Normal workflow for other banks
         if bank in ["BNB", "BNB1", "BNB2"]:
-            df_clean = clean_bnb(df)
+            # For BNB files, ensure correct bank_code format
+            bank_code = bank if bank in ["BNB1", "BNB2"] else "BNB1"
+            df_clean = clean_bnb(df, bank_code=bank_code, account_number=account)
         elif bank == "UNION":
             df_clean = clean_union(df)
         else:
