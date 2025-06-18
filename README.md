@@ -1,71 +1,145 @@
 # Bank Statements Project
 
-Base de proyecto Python para procesar archivos bancarios (ej. xlsx) en Windows.
+Python project for processing and enriching bank statement data from Excel files. Currently supports BCP, BNB, and UNION banks.
 
-## Estructura
-- `src/`: Código fuente principal
-  - `main.py`: Lógica principal de detección y limpieza
-- `data/`: Archivos de datos
-  - `raw/`: Archivos originales (.xls, .xlsx)
-  - `processed/`: Archivos procesados (.csv)
-- `tests/`: Pruebas
+## Project Overview
+- Automatic bank and account detection from file content
+- Bank-specific cleaning and standardization
+- Special BCP workflow with payment details enrichment
+- Clean CSV output for further processing
 
-## Requisitos
+## Current Structure
+```
+src/
+├── main.py           # Current main logic (to be refactored)
+├── extractors/       # Bank statement data extraction
+├── processors/       # Data cleaning and processing
+└── utils/           # Common utilities
+data/
+├── raw/             # Original bank files (.xls/.xlsx)
+└── processed/       # Cleaned and enriched CSVs
+tests/               # Test files
+```
+
+## Requirements
 - Python 3.8+
-- Activar el entorno virtual: `source .venv/Scripts/activate` (en bash Windows)
+- pandas, openpyxl for Excel processing
+- Virtual environment recommended
 
-## Primeros pasos
-1. Crear entorno virtual: `python -m venv .venv`
-2. Activar entorno virtual:
-   - Bash: `source .venv/Scripts/activate`
-   - CMD: `.venv\Scripts\activate.bat`
-3. Instalar dependencias: `pip install -r requirements.txt`
-4. Ejecutar: `python -m src.main`
+## Setup
+1. Create virtual environment:
+   ```bash
+   python -m venv .venv
+   ```
 
-## Bank Identification Logic
+2. Activate environment:
+   ```bash
+   # Windows (Git Bash)
+   source .venv/Scripts/activate
+   # Windows (CMD)
+   .venv\Scripts\activate.bat
+   ```
 
-This project identifies the bank and account number from the header or specific rows in each statement file. The logic is as follows:
+3. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-| Bank   | Pattern in Header/Row         | Account Example   | Detection Logic in Code         |
-|--------|------------------------------|-------------------|---------------------------------|
-| BNB1   | 'Número De cuenta' 1000092297| 1000092297        | Header column == '1000092297'   |
-| BNB2   | 'Número De cuenta' 1000264616| 1000264616        | Header column == '1000264616'   |
-| UNION  | Row contains 'Cuenta:' + num | 10000014847393    | Row with 'Cuenta:' and number   |
-| BCP    | Row with pattern XX-XXXX...  | 201-0005751-3-23  | Row with at least 2 hyphens     |
+## Usage
 
-- The detection logic is implemented in the `identificar_banco_y_cuenta` function in `src/main.py`.
-- Update this table if new banks or patterns are added.
+### Basic Statement Processing
+Process any bank statement:
+```bash
+python -m src.main <statement.xls>
+```
 
-## Data Cleaning Logic
+### BCP Enrichment Workflow
+1. First process BCP statement:
+   ```bash
+   python -m src.main bcpHistoricos.xls
+   ```
+   Creates: `data/processed/bcpHistoricos_clean.csv`
 
-Each bank's statements are cleaned according to their specific format:
+2. Then process payment details:
+   ```bash
+   python -m src.main ReporteAbonos.xls
+   ```
+   Creates: `data/processed/bcp_final.csv`
 
-### BCP Cleaning
-- Detecta encabezado buscando filas con 'Fecha' y 'Hora'
-- Elimina filas y columnas completamente vacías
-- Remueve filas informativas:
-  - Filas de "SALDO AL CIERRE"
-  - Filas con usuario "BATCH" y número de operación "0"
-- Solo mantiene transacciones reales con fechas válidas
+## Bank Detection Logic
 
-### UNION Cleaning
-- Detecta encabezado buscando "Fecha Movimiento"
-- Estandariza nombres de columnas
-- Limpia caracteres especiales en columna 'Adicionales':
-  - Remueve `\t`, `\n`, tabulaciones y saltos de línea
-  - Elimina espacios extras
-- Elimina filas de resumen ("Total Créditos", "Total Débitos", "Tránsito")
-- Asegura que todas las filas tengan fecha válida
+The project automatically identifies banks from statement content:
 
-### BNB Cleaning
-- Detecta encabezado buscando columna 'Fecha'
-- Elimina filas sin fecha
-- Invierte el orden para mantener cronología (primeros movimientos arriba)
+| Bank   | Detection Pattern            | Example Account    |
+|--------|----------------------------|-------------------|
+| BNB1   | Column = '1000092297'     | 1000092297       |
+| BNB2   | Column = '1000264616'     | 1000264616       |
+| UNION  | Row with 'Cuenta:'        | 10000014847393   |
+| BCP    | Pattern: XX-XXXX-X-XX     | 201-0005751-3-23 |
 
-## Common Features
-- Detección automática del banco y número de cuenta
-- Conversión inicial a CSV para mejor manejo
-- Estandarización de columnas por banco
-- Eliminación de filas y columnas vacías
-- Reset de índices para consistencia
-- Genera archivos limpios en `data/processed/`
+## Data Cleaning
+
+### Common Cleaning
+- Remove empty rows and columns
+- Standardize date formats
+- Clean special characters
+- Reset index for consistency
+
+### Bank-Specific Cleaning
+
+#### BCP
+- Detect headers with 'Fecha' and 'Hora'
+- Remove informational rows (SALDO AL CIERRE, BATCH operations)
+- Prepare for potential enrichment with payment details
+
+#### UNION
+- Find 'Fecha Movimiento' header
+- Standardize column names
+- Clean 'Adicionales' column
+- Remove summary rows
+
+#### BNB
+- Find 'Fecha' column
+- Remove rows without dates
+- Reverse order for chronological display
+
+## BCP Enrichment Process
+
+### Input Files
+- Bank statement (`bcpHistoricos.xls`)
+- Payment details (`ReporteAbonos.xls`)
+
+### Matching Logic
+Records are matched on:
+- Exact date match
+- Exact amount match
+
+### Enrichment Results
+- Matches are logged with statistics
+- Multiple matches are reported
+- Unmatched transactions are preserved
+- Final enriched statement in `bcp_final.csv`
+
+## Planned Improvements
+1. Modular Refactoring:
+   ```
+   src/
+   ├── main.py         # Entry point only
+   ├── reader.py       # Excel reading
+   ├── detector.py     # Bank detection
+   ├── cleaner/        # Bank-specific cleaning
+   ├── enricher/       # BCP enrichment
+   └── utils/          # Common tools
+   ```
+
+2. Code Quality:
+   - Move to English function names
+   - Add proper error handling
+   - Improve logging
+   - Add unit tests
+
+3. Features:
+   - Support more banks
+   - Add data validation
+   - Improve matching accuracy
+   - Add summary reports
