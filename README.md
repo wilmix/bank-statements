@@ -4,6 +4,10 @@ Base de proyecto Python para procesar archivos bancarios (ej. xlsx) en Windows.
 
 ## Estructura
 - `src/`: Código fuente principal
+  - `main.py`: Lógica principal de detección y limpieza
+- `data/`: Archivos de datos
+  - `raw/`: Archivos originales (.xls, .xlsx)
+  - `processed/`: Archivos procesados (.csv)
 - `tests/`: Pruebas
 
 ## Requisitos
@@ -31,3 +35,37 @@ This project identifies the bank and account number from the header or specific 
 
 - The detection logic is implemented in the `identificar_banco_y_cuenta` function in `src/main.py`.
 - Update this table if new banks or patterns are added.
+
+## Data Cleaning Logic
+
+Each bank's statements are cleaned according to their specific format:
+
+### BCP Cleaning
+- Detecta encabezado buscando filas con 'Fecha' y 'Hora'
+- Elimina filas y columnas completamente vacías
+- Remueve filas informativas:
+  - Filas de "SALDO AL CIERRE"
+  - Filas con usuario "BATCH" y número de operación "0"
+- Solo mantiene transacciones reales con fechas válidas
+
+### UNION Cleaning
+- Detecta encabezado buscando "Fecha Movimiento"
+- Estandariza nombres de columnas
+- Limpia caracteres especiales en columna 'Adicionales':
+  - Remueve `\t`, `\n`, tabulaciones y saltos de línea
+  - Elimina espacios extras
+- Elimina filas de resumen ("Total Créditos", "Total Débitos", "Tránsito")
+- Asegura que todas las filas tengan fecha válida
+
+### BNB Cleaning
+- Detecta encabezado buscando columna 'Fecha'
+- Elimina filas sin fecha
+- Invierte el orden para mantener cronología (primeros movimientos arriba)
+
+## Common Features
+- Detección automática del banco y número de cuenta
+- Conversión inicial a CSV para mejor manejo
+- Estandarización de columnas por banco
+- Eliminación de filas y columnas vacías
+- Reset de índices para consistencia
+- Genera archivos limpios en `data/processed/`
